@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package monitoring;
+
+// Định nghĩa service
+service MonitorService {
+    // Bidirectional streaming: Client gửi stream Metric, Server trả về stream Command
+    rpc StreamMetrics (stream MetricMessage) returns (stream CommandMessage);
+}
+
+// Cấu trúc dữ liệu gửi đi (theo yêu cầu bài Lab: time, hostname, metric, value) 
+message MetricMessage {
+    string timestamp = 1;
+    string hostname = 2;
+    string metric = 3;
+    float value = 4;
+}
+
+// Cấu trúc lệnh từ Server gửi về (ví dụ đơn giản)
+message CommandMessage {
+    string command_id = 1;
+    string action = 2; // Ví dụ: "stop_cpu_monitor", "restart"
+}

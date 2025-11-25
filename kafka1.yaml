@@ -1,0 +1,99 @@
+# file: kafka.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: kafka
+data:
+  base.properties: |
+    process.roles=broker,controller
+    controller.listener.names=CONTROLLER
+    listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+    listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+    inter.broker.listener.name=PLAINTEXT
+    log.dirs=/var/lib/kafka/data
+    controller.quorum.bootstrap.servers=kafka-0.kafka-service.kafka.svc.cluster.local:9093,kafka-1.kafka-service.kafka.svc.cluster.local:9093
+    controller.quorum.voters=0@kafka-0.kafka-service.kafka.svc.cluster.local:9093,1@kafka-1.kafka-service.kafka.svc.cluster.local:9093
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: kafka
+spec:
+  ports:
+    - name: kafka
+      port: 9092
+      protocol: TCP
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      protocol: TCP
+      targetPort: 9093
+  clusterIP: None
+  selector:
+    app: kafka
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: kafka
+spec:
+  serviceName: kafka-service
+  replicas: 2
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:latest
+          command: ["sh", "-c"]
+          args:
+          - |
+            set -e
+            NODE_ID="$(hostname | awk -F'-' '{print $2}')"
+            CLUSTER_ID="uhaGgVSiR3W05yPkn_pKgw"
+
+            echo "node.id=${NODE_ID}" >> /opt/kafka/config/server.properties
+            echo "advertised.listeners=PLAINTEXT://kafka-${NODE_ID}.kafka-service.kafka.svc.cluster.local:9092,CONTROLLER://kafka-${NODE_ID}.kafka-service.kafka.svc.cluster.local:9093" >> /opt/kafka/config/server.properties
+            cat /kafka/config/base.properties >> /opt/kafka/config/server.properties
+
+            if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+              /opt/kafka/bin/kafka-storage.sh format -t "${CLUSTER_ID}" -c /opt/kafka/config/server.properties
+            fi
+            exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
+          ports:
+            - containerPort: 9092
+            - containerPort: 9093
+          volumeMounts:
+            - name: datadir
+              mountPath: /var/lib/kafka/data
+            - name: config
+              mountPath: /kafka/config
+      volumes:
+        - name: config
+          configMap:
+            name: kafka-config
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi
+
