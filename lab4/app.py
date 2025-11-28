@@ -92,8 +92,8 @@ def update_dashboard():
         if isinstance(diskWrite, float): diskWrite = round(mem, 2)
         if isinstance(netIn, float): netIn = round(mem, 2)
         if isinstance(netOut, float): netOut = round(mem, 2)
-        if isinstance(ts, str) and ts != 'N/A':
-            ts = datetime.datetime.fromtimestamp(float(ts)).strftime('%Y-%m-%d %H:%M:%S')
+        # if isinstance(ts, str) and ts != 'N/A':
+        #     ts = datetime.datetime.fromtimestamp(float(ts)).strftime('%Y-%m-%d %H:%M:%S')
         
         data_list.append([host, cpu, mem, diskRead, diskWrite, netIn, netOut, ts])
     
